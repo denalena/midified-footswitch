@@ -21,18 +21,19 @@ void setup() {
   Serial.begin(115200);
   Serial.println("START");
 
-  buttons[0].pin = 18;
-  buttons[1].pin = 19;
-  buttons[2].pin = 20;
-  buttons[3].pin = 21;
-
-  buttons[0].cc = 80;
-  buttons[1].cc = 81;
-  buttons[2].cc = 82;
-  buttons[3].cc = 83;
+  buttons[0].pin = 9;
+  buttons[1].pin = 8;
+  buttons[2].pin = 7;
+  buttons[3].pin = 6;
+  
+  buttons[0].cc = 64;
+  buttons[1].cc = 65;
+  buttons[2].cc = 66;
+  buttons[3].cc = 67;
 
   for (int i=0; i<NUM_BUTTONS; i++) {
     pinMode(buttons[i].pin, INPUT_PULLUP);
+    buttons[i].state = digitalRead(buttons[i].pin);
   }
 }
 
@@ -44,6 +45,8 @@ void loop() {
     button& currentButton = buttons[i];
     bool value = digitalRead(currentButton.pin);
 
+    unsigned long currentDelta = currentMillis - currentButton.changed;
+
     // skip to next button if state did not change slow enough
     if (
       value == currentButton.state
@@ -52,6 +55,7 @@ void loop() {
       continue;
     }
 
+    currentButton.oldState = currentButton.state;
     currentButton.state = !currentButton.state;
     currentButton.changed = currentMillis;
 
@@ -61,18 +65,22 @@ void loop() {
       ccValue = currentButton.ccMax;
     }
 
-    midiEventPacket_t event = {0x0B, 0xB0 | currentButton.ccChannel, currentButton.cc, ccValue};
+    sendMIDI(i, currentButton.ccChannel, currentButton.cc, ccValue);
+  }
+
+  MidiUSB.flush();
+}
+
+void sendMIDI(int buttonId, int channel, int cc, int value) {
+    midiEventPacket_t event = {0x0B, 0xB0 | channel, cc, value};
     MidiUSB.sendMIDI(event);
 
     Serial.print("button ");
-    Serial.print(i);
+    Serial.print(buttonId);
     Serial.print(" event: ");
     Serial.print(event.byte1, HEX);
     Serial.print(" ");
     Serial.print(event.byte2, HEX);
     Serial.print(" ");
     Serial.println(event.byte3, HEX);
-  }
-
-  MidiUSB.flush();
 }
